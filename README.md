@@ -1,232 +1,269 @@
-# ViViD Dryer — Klipper Integration
+# ViViD Dryer — Klipper Extra
 
-Full Klipper control for the **ViViD filament dryer** with two operating modes:
-timed dry cycles and closed-loop humidity-hold.
-
----
-
-## Table of Contents
-
-1. [What It Does](#what-it-does)
-2. [Hardware Requirements](#hardware-requirements)
-3. [Installation](#installation)
-4. [Config Reference](#config-reference)
-5. [GCode Command Reference](#gcode-command-reference)
-6. [Humidity Sensor Notes](#humidity-sensor-notes)
-7. [Mainsail Widget](#mainsail-widget)
-8. [Troubleshooting](#troubleshooting)
+A Klipper extra that adds intelligent filament drying control to the ViViD filament dryer.
+Supports both **timed dry cycles** and **humidity-hold mode** with proportional temperature
+control. Multiple ViViD units are supported simultaneously.
 
 ---
 
-## What It Does
+## What it does
 
-### Mode 1 — Timed Dry Cycle
+### Mode 1 — Timed dry cycle
 
-```
-VIVID_DRY_START TEMP=55 HOURS=6
-```
-
-Heats the drying chamber to a fixed temperature for a fixed duration, then
-turns the heater off automatically.  The remaining time is exposed via
-`printer.vivid_dryer.remaining_seconds` so Moonraker / Mainsail can display
-a live countdown.
-
-### Mode 2 — Humidity-Hold
+Set a temperature and duration. The heater runs at the target temperature and
+automatically shuts off when the timer expires.
 
 ```
-VIVID_DRY_START HUMIDITY=30 TEMP_MAX=55 TEMP_MIN=35
+VIVID_DRY_START_VIVID_1 TEMP=55 HOURS=4
+VIVID_DRY_START_VIVID_1 TEMP=65 HOURS=6 MINUTES=30
 ```
 
-Reads a humidity sensor (see [Humidity Sensor Notes](#humidity-sensor-notes))
-and modulates the heater temperature between `TEMP_MIN` and `TEMP_MAX` to
-drive relative humidity down to the target percentage and hold it there
-indefinitely (or until an optional `MAX_HOURS` timeout is hit).
+### Mode 2 — Humidity-hold
 
-**Control loop** (runs every `humidity_poll_interval` seconds):
+Set a target humidity percentage. The controller reads the average of the two AHT3X
+sensors and modulates the heater temperature between `TEMP_MIN` and `TEMP_MAX` to
+drive the filament spool to the target humidity and hold it there indefinitely (or
+until an optional `MAX_HOURS` timeout).
 
-| Condition | Action |
+```
+VIVID_DRY_START_VIVID_1 HUMIDITY=30 TEMP_MAX=55 TEMP_MIN=35
+VIVID_DRY_START_VIVID_1 HUMIDITY=20 TEMP_MAX=60 TEMP_MIN=40 MAX_HOURS=12
+```
+
+**Control formula:**
+```
+new_temp = TEMP_MIN + (TEMP_MAX - TEMP_MIN)
+           * (current_humidity - target_humidity) / (target_humidity * 0.5)
+```
+Clamped to `[TEMP_MIN, TEMP_MAX]`. A configurable deadband prevents unnecessary
+temperature adjustments when humidity is already close to target.
+
+---
+
+## Hardware requirements
+
+Each ViViD unit requires the following already configured in `printer.cfg`:
+
+| Config section | Description |
 |---|---|
-| humidity > target + deadband | raise temp (linear interpolation toward `TEMP_MAX`) |
-| humidity < target − deadband | lower temp toward `TEMP_MIN` |
-| within deadband | hold current temp |
+| `[temperature_sensor <Name>_dryer_left]` | AHT3X left sensor (software I2C) |
+| `[temperature_sensor <Name>_dryer_right]` | AHT3X right sensor (software I2C) |
+| `[temperature_sensor <Name>_PTC_temp]` | PTC ambient temperature thermistor |
+| `[heater_generic <Name>_dryer]` | Heater using `temperature_combined` of both AHT3X sensors |
+| `[verify_heater <Name>_dryer]` | Heater verification |
+| `[heater_fan <Name>_dryer_fan]` | Fan tied to the heater |
 
-There is no fixed end time — the dryer runs until you call `VIVID_DRY_STOP`
-or `MAX_HOURS` elapses.
+The `vivid_dryer.cfg` in this repo only adds the `[vivid_dryer]` controller section —
+**do not duplicate** the hardware blocks above.
+
+### AHT3X wiring notes
+
+The AHT3X sensors are configured using **software I2C** (`i2c_software_scl_pin` /
+`i2c_software_sda_pin`) on the ViViD MCU. They are registered internally by Klipper
+as `aht10 <sensor_name>` (from `klippy/extras/aht10.py`). The `humidity_sensor` config
+option must use the `aht10 <name>` lookup keys, e.g.:
+
+```ini
+humidity_sensor: aht10 Vivid_1_dryer_left, aht10 Vivid_1_dryer_right
+```
 
 ---
 
-## Hardware Requirements
-
-| Component | Notes |
-|---|---|
-| Heater element | Any heater pin supported by your MCU |
-| Temperature sensor | NTC 3950, AHT2x, or any Klipper-supported type |
-| Humidity sensor *(optional)* | SHT31 or similar I²C sensor — only needed for humidity-hold mode |
-
----
-
-## Installation
-
-### 1. Copy the Klipper extra
+## Quick install
 
 ```bash
-cp klippy/extras/vivid_dryer.py ~/klipper/klippy/extras/
-```
-
-### 2. Restart Klipper
-
-```bash
-sudo systemctl restart klipper
-```
-
-### 3. Add config includes to `printer.cfg`
-
-```ini
-[include vivid_dryer.cfg]
-
-# Optional — Mainsail macro buttons
-[include mainsail/vivid_dryer_panel.cfg]
-
-# Optional — protect dryer from idle timeout
-[include idle_timeout_guard.cfg]
-```
-
-Then in `[idle_timeout]` (if using the guard):
-
-```ini
-[idle_timeout]
-gcode:
-  _IDLE_TIMEOUT_GUARD
-timeout: 600
-```
-
-### 4. Edit `vivid_dryer.cfg`
-
-Set the correct `heater_pin` and `sensor_pin` for your hardware.  Optionally
-uncomment and configure the `[temperature_sensor vivid_humidity]` block if you
-have a humidity sensor wired.
-
-### 5. Firmware restart
-
-```
-FIRMWARE_RESTART
+curl -fsSL https://raw.githubusercontent.com/ikwidtech/vivid_heater/main/install.sh | bash
 ```
 
 ---
 
-## Config Reference
+## Manual install
 
-All options go inside the `[vivid_dryer]` section in `vivid_dryer.cfg`.
+1. Copy the Python extra to your Klipper installation:
+   ```bash
+   cp klippy/extras/vivid_dryer.py ~/klipper/klippy/extras/
+   ```
 
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `heater` | string | `Vivid_1_dryer` | Name of the `[heater_generic]` block |
-| `humidity_sensor` | string | *(unset)* | Name of the `temperature_sensor` that exposes `humidity` — omit if no sensor |
-| `default_temp` | float | `55.0` | Fallback heater temperature (°C) |
-| `default_duration` | int | `14400` | Fallback duration (seconds) when no time args are given |
-| `humidity_deadband` | float | `3.0` | ±RH% band around target where no temp change is made |
-| `humidity_poll_interval` | int | `30` | Seconds between humidity reads / temp adjustments |
+2. Copy config files to your Klipper config directory:
+   ```bash
+   cp config/vivid_dryer.cfg        ~/printer_data/config/
+   cp config/idle_timeout_guard.cfg ~/printer_data/config/vivid_idle_timeout_guard.cfg
+   cp mainsail/vivid_dryer_panel.cfg ~/printer_data/config/
+   ```
 
----
+3. Add includes to `printer.cfg`:
+   ```ini
+   [include vivid_dryer.cfg]
+   [include vivid_dryer_panel.cfg]
+   ```
 
-## GCode Command Reference
+4. (Optional) Copy the Mainsail widget:
+   ```bash
+   cp mainsail/vivid_dryer.html ~/mainsail/
+   ```
 
-### `VIVID_DRY_START`
-
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `TEMP` | float | `default_temp` | Heater temperature for timed mode (°C) |
-| `HOURS` | float | 0 | Duration hours |
-| `MINUTES` | float | 0 | Duration minutes |
-| `SECONDS` | float | 0 | Duration seconds |
-| `HUMIDITY` | float | *(unset)* | **Triggers humidity-hold mode.** Target % RH |
-| `TEMP_MAX` | float | `default_temp` | Max heater temp in humidity-hold mode (°C) |
-| `TEMP_MIN` | float | `35.0` | Min heater temp in humidity-hold mode (°C) |
-| `MAX_HOURS` | float | 0 (= ∞) | Optional timeout for humidity-hold mode |
-
-If `HUMIDITY` is supplied the dryer enters humidity-hold mode; otherwise it
-uses timed mode.  If no duration is given for timed mode, `default_duration`
-is used.
-
-### `VIVID_DRY_STOP`
-
-Stops any active cycle and turns the heater off.
-
-```
-VIVID_DRY_STOP
-```
-
-### `VIVID_DRY_STATUS`
-
-Prints current state to the GCode console.
-
-```
-VIVID_DRY_STATUS
-```
+5. Restart Klipper:
+   ```bash
+   sudo systemctl restart klipper
+   ```
 
 ---
 
-## Humidity Sensor Notes
+## Config reference
 
-The `humidity_sensor` config option must name a Klipper object whose
-`get_status(eventtime)` method returns a dict containing a `humidity` key
-(float, % RH).
+The `[vivid_dryer <Name>]` section accepts the following options:
 
-**Example — SHT31 sensor** (requires a Klipper SHT31 extra such as
-`temperature_sensor_sht31`):
+| Option | Default | Description |
+|---|---|---|
+| `heater` | `Vivid_1_dryer` | Name of the `heater_generic` section to control |
+| `humidity_sensor` | *(none)* | Comma-separated list of `aht10 <name>` sensor object keys |
+| `default_temp` | `55.0` | Default drying temperature (°C) used when TEMP is omitted |
+| `default_duration` | `14400` | Default duration in seconds (4 hours) used when HOURS/MINUTES/SECONDS are omitted |
+| `humidity_deadband` | `3.0` | Humidity deadband (% RH) — only adjust temp when outside this range |
+| `humidity_poll_interval` | `30` | Seconds between humidity control loop iterations |
+
+---
+
+## GCode command reference
+
+### Multi-instance naming
+
+| Config section | Command prefix |
+|---|---|
+| `[vivid_dryer]` | `VIVID_DRY_START`, `VIVID_DRY_STOP`, `VIVID_DRY_STATUS` |
+| `[vivid_dryer Vivid_1]` | `VIVID_DRY_START_VIVID_1`, `VIVID_DRY_STOP_VIVID_1`, `VIVID_DRY_STATUS_VIVID_1` |
+| `[vivid_dryer Vivid_2]` | `VIVID_DRY_START_VIVID_2`, `VIVID_DRY_STOP_VIVID_2`, `VIVID_DRY_STATUS_VIVID_2` |
+
+### VIVID_DRY_START[_NAME]
+
+**Timed mode parameters:**
+
+| Parameter | Default | Description |
+|---|---|---|
+| `TEMP` | `default_temp` | Target temperature in °C (max 75) |
+| `HOURS` | `0` | Duration hours |
+| `MINUTES` | `0` | Duration minutes |
+| `SECONDS` | `0` | Duration seconds |
+
+If no duration is provided, `default_duration` is used.
+
+**Humidity-hold mode parameters** (triggered when `HUMIDITY` is provided):
+
+| Parameter | Default | Description |
+|---|---|---|
+| `HUMIDITY` | *(required)* | Target humidity in % RH |
+| `TEMP_MAX` | `default_temp` | Maximum heater temperature (°C) |
+| `TEMP_MIN` | `35.0` | Minimum heater temperature (°C) |
+| `MAX_HOURS` | `0` | Maximum run time in hours (0 = unlimited) |
+
+### VIVID_DRY_STOP[_NAME]
+
+Stops any active dry cycle and turns off the heater.
+
+### VIVID_DRY_STATUS[_NAME]
+
+Reports current mode, temperature, humidity, and time remaining.
+
+---
+
+## Multiple ViViD units
+
+Each physical ViViD unit gets its own `[vivid_dryer <Name>]` section. Klipper
+discovers all instances automatically via `load_config_prefix`.
+
+Example config for two units:
 
 ```ini
-[temperature_sensor vivid_humidity]
-sensor_type: SHT31
-i2c_address: 68
-i2c_mcu: mcu
+[vivid_dryer Vivid_1]
+heater:                 Vivid_1_dryer
+humidity_sensor:        aht10 Vivid_1_dryer_left, aht10 Vivid_1_dryer_right
+default_temp:           55.0
+default_duration:       14400
+humidity_deadband:      3.0
+humidity_poll_interval: 30
+
+[vivid_dryer Vivid_2]
+heater:                 Vivid_2_dryer
+humidity_sensor:        aht10 Vivid_2_dryer_left, aht10 Vivid_2_dryer_right
+default_temp:           55.0
+default_duration:       14400
+humidity_deadband:      3.0
+humidity_poll_interval: 30
 ```
 
-Then in `[vivid_dryer]`:
-
-```ini
-humidity_sensor: vivid_humidity
+GCode commands for the second unit:
 ```
-
-The `vivid_dryer` extra reads `humidity` from `get_status()` defensively —
-if the sensor is unavailable, humidity-hold mode is disabled and timed mode
-still works normally.
+VIVID_DRY_START_VIVID_2 TEMP=55 HOURS=4
+VIVID_DRY_STATUS_VIVID_2
+VIVID_DRY_STOP_VIVID_2
+```
 
 ---
 
-## Mainsail Widget
+## Mainsail widget
 
-A standalone dark-theme HTML widget (`mainsail/vivid_dryer.html`) is included.
-It auto-polls Moonraker every 5 seconds and shows:
+Copy `mainsail/vivid_dryer.html` to your Mainsail web directory, then navigate to:
+
+```
+http://<your-printer-ip>/vivid_dryer.html
+```
+
+The widget auto-discovers all `vivid_dryer *` instances from Moonraker, and renders
+a card for each one showing:
 
 - Mode badge (IDLE / TIMED / HUMIDITY)
-- Current and target heater temperature
-- Current and target humidity (when sensor is available)
-- Live countdown timer (HH:MM:SS) with progress bar (timed mode)
-- Humidity sparkline chart (last 30 readings, humidity-hold mode)
-- Start / Stop controls for both modes
+- Heater current and target temperature
+- Left and right AHT3X humidity readings
+- Average humidity (large)
+- PTC ambient temperature (if available)
+- Time remaining countdown
+- Progress bar (timed mode)
+- Humidity sparkline (last 30 readings)
+- Controls for both modes with a Stop button
 
-### Serving the widget
+The widget uses `window.location.origin` as the Moonraker base URL and polls every 5 seconds.
 
-Copy `vivid_dryer.html` into a directory served by your Mainsail web server,
-or serve it with a simple HTTP server on the Pi:
+---
 
-```bash
-# Quick approach — serve from Moonraker's www directory
-cp mainsail/vivid_dryer.html ~/mainsail/vivid_dryer.html
-```
+## idle_timeout integration
 
-Then in Mainsail → **Settings → Interface → Custom Panels**, add an iframe
-pointing to `http://<your-printer-ip>/vivid_dryer.html`.
+To prevent Klipper's idle timeout from turning off the dryer heater mid-cycle:
+
+1. Include the guard file in `printer.cfg`:
+   ```ini
+   [include vivid_idle_timeout_guard.cfg]
+   ```
+
+2. Set your `[idle_timeout]` gcode to call the guard:
+   ```ini
+   [idle_timeout]
+   gcode: _VIVID_IDLE_TIMEOUT_CHECK
+   timeout: 600
+   ```
+
+If any ViViD dryer is active, `_VIVID_IDLE_TIMEOUT_CHECK` skips the shutdown.
+Otherwise it runs the normal `TURN_OFF_HEATERS` + `M84` sequence.
 
 ---
 
 ## Troubleshooting
 
-| Symptom | Check |
-|---|---|
-| `Error: heater 'Vivid_1_dryer' not found` | Make sure `[heater_generic Vivid_1_dryer]` is in your config and `heater:` in `[vivid_dryer]` matches exactly |
-| `humidity-hold mode is unavailable` | `humidity_sensor` is not set or the sensor object wasn't found — check Klipper logs |
-| Heater turns on but idle timeout kills it | Make sure `_IDLE_TIMEOUT_GUARD` is wired into `[idle_timeout]` |
-| Widget shows "OFFLINE" | Check that Moonraker is running and the widget URL matches your printer's IP/port |
-| Humidity reads 0% always | Verify the sensor wiring and that `get_status()` returns a `humidity` key |
+**"heater not available" error**
+- Check that the `heater` option in `[vivid_dryer]` matches a `[heater_generic]` section name exactly.
+
+**"no humidity sensors configured" error**
+- Ensure `humidity_sensor` lists the correct `aht10 <name>` keys.
+- AHT3X sensors defined as `[temperature_sensor Vivid_1_dryer_left]` are registered by Klipper as `aht10 Vivid_1_dryer_left`.
+
+**Humidity readings show 0.0 or are missing**
+- Verify the AHT3X wiring and I2C pins are correct.
+- Check `~/printer_data/logs/klippy.log` for sensor errors.
+
+**Widget shows "Cannot reach Moonraker"**
+- Ensure Moonraker is running: `sudo systemctl status moonraker`
+- Check that the widget is served from the same host as Moonraker (CORS).
+
+**GCode command not found**
+- Ensure `vivid_dryer.py` is in `~/klipper/klippy/extras/`
+- Ensure `[include vivid_dryer.cfg]` is in `printer.cfg`
+- Restart Klipper: `sudo systemctl restart klipper`
