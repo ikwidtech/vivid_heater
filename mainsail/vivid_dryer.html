@@ -3,15 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ViViD Dryer Control</title>
+  <title>ViViD Dryer</title>
   <style>
-    /* ------------------------------------------------------------------ */
-    /* Base / reset                                                         */
-    /* ------------------------------------------------------------------ */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Roboto', 'Segoe UI', sans-serif;
+      font-family: 'Segoe UI', Roboto, Arial, sans-serif;
       background: #121212;
       color: #e0e0e0;
       min-height: 100vh;
@@ -21,593 +18,673 @@
     h1 {
       font-size: 1.4rem;
       font-weight: 600;
-      color: #fff;
+      color: #90caf9;
       margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      letter-spacing: 0.5px;
     }
-    h1 svg { flex-shrink: 0; }
 
-    /* ------------------------------------------------------------------ */
-    /* Cards                                                               */
-    /* ------------------------------------------------------------------ */
+    #instances {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
     .card {
       background: #1e1e1e;
+      border: 1px solid #2c2c2c;
       border-radius: 8px;
       padding: 16px;
-      margin-bottom: 16px;
-      border: 1px solid #2c2c2c;
+      min-width: 320px;
+      max-width: 440px;
+      flex: 1 1 320px;
     }
-    .card h2 {
-      font-size: 0.85rem;
-      font-weight: 500;
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #cfd8dc;
+    }
+
+    .badge {
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.8px;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: #9e9e9e;
+    }
+    .badge-idle    { background: #424242; color: #9e9e9e; }
+    .badge-timed   { background: #0d47a1; color: #90caf9; }
+    .badge-humidity { background: #1b5e20; color: #81c784; }
+    .badge-offline { background: #b71c1c; color: #ef9a9a; }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 16px;
+      margin-bottom: 14px;
+    }
+
+    .stat-item label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #757575;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .stat-item .val {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #e0e0e0;
+    }
+
+    .stat-item .val.hot  { color: #ef9a9a; }
+    .stat-item .val.cool { color: #90caf9; }
+    .stat-item .val.ok   { color: #81c784; }
+
+    /* Progress bar */
+    .progress-wrap {
       margin-bottom: 12px;
     }
-
-    /* ------------------------------------------------------------------ */
-    /* Status card                                                         */
-    /* ------------------------------------------------------------------ */
-    .status-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 12px;
-    }
-    .stat { display: flex; flex-direction: column; gap: 2px; }
-    .stat-label { font-size: 0.72rem; color: #757575; text-transform: uppercase; letter-spacing: 0.06em; }
-    .stat-value { font-size: 1.3rem; font-weight: 600; color: #fff; }
-    .stat-unit  { font-size: 0.75rem; color: #9e9e9e; }
-
-    /* mode badge */
-    .badge {
-      display: inline-block;
-      padding: 3px 10px;
-      border-radius: 12px;
-      font-size: 0.78rem;
-      font-weight: 600;
-      letter-spacing: 0.06em;
-    }
-    .badge-idle     { background: #2c2c2c; color: #9e9e9e; }
-    .badge-timed    { background: #1a3a5c; color: #4fc3f7; }
-    .badge-humidity { background: #1a3d2c; color: #66bb6a; }
-    .badge-offline  { background: #3c1a1a; color: #ef9a9a; }
-
-    /* ------------------------------------------------------------------ */
-    /* Progress bar                                                        */
-    /* ------------------------------------------------------------------ */
-    .progress-wrap { margin-top: 12px; }
     .progress-label {
-      display: flex; justify-content: space-between;
-      font-size: 0.72rem; color: #757575; margin-bottom: 4px;
+      font-size: 0.75rem;
+      color: #757575;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
     }
-    .progress-bar {
-      height: 6px; background: #2c2c2c; border-radius: 3px; overflow: hidden;
-    }
-    .progress-fill {
-      height: 100%; background: #4fc3f7; border-radius: 3px;
-      transition: width 1s linear;
-    }
-
-    /* ------------------------------------------------------------------ */
-    /* Humidity sparkline                                                  */
-    /* ------------------------------------------------------------------ */
-    #sparklineWrap { margin-top: 12px; }
-    #sparklineWrap canvas {
-      width: 100%;
-      height: 70px;
+    .progress-bar-bg {
+      background: #2c2c2c;
       border-radius: 4px;
-      background: #161616;
-      display: block;
+      height: 6px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      background: #4fc3f7;
+      transition: width 0.5s ease;
     }
 
-    /* ------------------------------------------------------------------ */
-    /* Forms                                                               */
-    /* ------------------------------------------------------------------ */
+    /* Sparkline */
+    .sparkline-wrap {
+      margin-bottom: 14px;
+    }
+    .sparkline-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #757575;
+      margin-bottom: 4px;
+    }
+    svg.sparkline {
+      width: 100%;
+      height: 60px;
+      display: block;
+      background: #2c2c2c;
+      border-radius: 4px;
+    }
+
+    /* Controls */
+    .controls { margin-top: 14px; }
+
     .form-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 6px;
+      margin-bottom: 8px;
       align-items: flex-end;
-      margin-bottom: 10px;
     }
-    .form-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 80px; }
-    .form-group label { font-size: 0.72rem; color: #9e9e9e; text-transform: uppercase; letter-spacing: 0.06em; }
-    .form-group input {
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 60px;
+    }
+
+    .form-field label {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #757575;
+      margin-bottom: 3px;
+    }
+
+    .form-field input {
       background: #2c2c2c;
-      border: 1px solid #3c3c3c;
+      border: 1px solid #424242;
       border-radius: 4px;
       color: #e0e0e0;
-      font-size: 0.9rem;
-      padding: 7px 10px;
+      padding: 5px 7px;
+      font-size: 0.85rem;
       width: 100%;
+    }
+
+    .form-field input:focus {
       outline: none;
-      transition: border-color 0.15s;
+      border-color: #4fc3f7;
     }
-    .form-group input:focus { border-color: #4fc3f7; }
 
-    /* ------------------------------------------------------------------ */
-    /* Buttons                                                             */
-    /* ------------------------------------------------------------------ */
-    .btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 9px 18px;
-      border: none; border-radius: 4px;
-      font-size: 0.85rem; font-weight: 600; cursor: pointer;
-      transition: opacity 0.15s, transform 0.1s;
+    .section-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #616161;
+      margin-bottom: 6px;
+      margin-top: 10px;
     }
-    .btn:active { transform: scale(0.97); }
-    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    .btn-primary  { background: #1976d2; color: #fff; }
-    .btn-primary:hover:not(:disabled)  { background: #1565c0; }
-    .btn-green    { background: #2e7d32; color: #fff; }
-    .btn-green:hover:not(:disabled)    { background: #1b5e20; }
-    .btn-danger   { background: #c62828; color: #fff; }
-    .btn-danger:hover:not(:disabled)   { background: #b71c1c; }
+    button {
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 6px 14px;
+      transition: opacity 0.15s;
+    }
+    button:hover { opacity: 0.85; }
+    button:active { opacity: 0.7; }
 
-    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+    .btn-timed  { background: #1565c0; color: #e3f2fd; }
+    .btn-humid  { background: #2e7d32; color: #e8f5e9; }
+    .btn-stop   { background: #c62828; color: #ffebee; }
+    .btn-row    { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 
-    /* ------------------------------------------------------------------ */
-    /* Toast                                                               */
-    /* ------------------------------------------------------------------ */
+    hr.divider {
+      border: none;
+      border-top: 1px solid #2c2c2c;
+      margin: 12px 0;
+    }
+
+    /* Toast */
     #toast {
-      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-      background: #323232; color: #e0e0e0;
-      padding: 10px 20px; border-radius: 4px;
-      font-size: 0.85rem; opacity: 0; pointer-events: none;
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #37474f;
+      color: #e0e0e0;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      opacity: 0;
       transition: opacity 0.3s;
-      z-index: 9999;
+      pointer-events: none;
+      z-index: 1000;
+      white-space: nowrap;
     }
     #toast.show { opacity: 1; }
+    #toast.err  { background: #b71c1c; }
 
-    /* ------------------------------------------------------------------ */
-    /* Responsive                                                          */
-    /* ------------------------------------------------------------------ */
-    @media (max-width: 480px) {
-      .status-grid { grid-template-columns: 1fr 1fr; }
+    .offline-banner {
+      text-align: center;
+      color: #ef9a9a;
+      padding: 24px;
+      font-size: 0.9rem;
     }
   </style>
 </head>
 <body>
+  <h1>&#x1F9C3; ViViD Dryer</h1>
+  <div id="instances"><p style="color:#757575;font-size:0.85rem;">Connecting to Moonraker…</p></div>
+  <div id="toast"></div>
 
-<h1>
-  <!-- flame icon -->
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="#ff7043">
-    <path d="M13.5 0.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73
-             -2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14
-             c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67z
-             M11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12
-             1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04
-             0 2.65-2.15 4.8-4.8 4.8z"/>
-  </svg>
-  ViViD Dryer Control
-</h1>
+  <script>
+    'use strict';
 
-<!-- -------------------------------------------------------------------- -->
-<!-- Status card                                                           -->
-<!-- -------------------------------------------------------------------- -->
-<div class="card" id="statusCard">
-  <h2>Status</h2>
-  <div class="status-grid">
-    <div class="stat">
-      <span class="stat-label">Mode</span>
-      <span id="modeBadge" class="badge badge-idle">IDLE</span>
-    </div>
-    <div class="stat">
-      <span class="stat-label">Heater</span>
-      <span class="stat-value" id="heaterTemp">—</span>
-      <span class="stat-unit" id="heaterTarget"></span>
-    </div>
-    <div class="stat" id="humidStat" style="display:none;">
-      <span class="stat-label">Humidity</span>
-      <span class="stat-value" id="humidValue">—</span>
-      <span class="stat-unit" id="humidTarget"></span>
-    </div>
-    <div class="stat">
-      <span class="stat-label">Time Left</span>
-      <span class="stat-value" id="timeLeft">—</span>
-    </div>
-  </div>
+    const POLL_MS = 5000;
+    // Set BASE to your Moonraker URL when serving the widget from a different origin,
+    // e.g. 'http://192.168.1.100:7125'.  Moonraker must have CORS enabled for that
+    // origin in moonraker.conf (cors_domains).  Leave empty for same-origin use.
+    const BASE = '';
 
-  <!-- progress bar — timed mode only -->
-  <div class="progress-wrap" id="progressWrap" style="display:none;">
-    <div class="progress-label">
-      <span>Progress</span>
-      <span id="progressPct">0%</span>
-    </div>
-    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
-  </div>
+    let instances = [];         // array of printer object keys, e.g. ["vivid_dryer Vivid_1"]
+    let sparkData = {};         // { key: [ {t, h} ] }   — humidity history per instance
+    // { key: { remaining, totalSecs, lastPoll } }
+    let countdownState = {};
+    let tickTimer = null;
 
-  <!-- sparkline — humidity mode only -->
-  <div id="sparklineWrap" style="display:none;">
-    <canvas id="sparkline"></canvas>
-  </div>
+    // ------------------------------------------------------------------
+    // Moonraker API helpers
+    // ------------------------------------------------------------------
 
-  <!-- stop button -->
-  <div class="btn-row" id="stopRow" style="display:none; margin-top:14px;">
-    <button class="btn btn-danger" onclick="sendStop()">⏹ Stop Dryer</button>
-  </div>
-</div>
-
-<!-- -------------------------------------------------------------------- -->
-<!-- Timed mode controls                                                   -->
-<!-- -------------------------------------------------------------------- -->
-<div class="card">
-  <h2>Timed Dry Cycle</h2>
-  <div class="form-row">
-    <div class="form-group">
-      <label>Temp (°C)</label>
-      <input type="number" id="timedTemp" value="55" min="1" max="70" step="1" />
-    </div>
-    <div class="form-group">
-      <label>Hours</label>
-      <input type="number" id="timedHours" value="4" min="0" max="72" step="1" />
-    </div>
-    <div class="form-group">
-      <label>Minutes</label>
-      <input type="number" id="timedMinutes" value="0" min="0" max="59" step="1" />
-    </div>
-    <div class="form-group">
-      <label>Seconds</label>
-      <input type="number" id="timedSeconds" value="0" min="0" max="59" step="1" />
-    </div>
-  </div>
-  <div class="btn-row">
-    <button class="btn btn-primary" onclick="startTimed()">▶ Start Timed Dry</button>
-  </div>
-</div>
-
-<!-- -------------------------------------------------------------------- -->
-<!-- Humidity-hold mode controls                                           -->
-<!-- -------------------------------------------------------------------- -->
-<div class="card">
-  <h2>Humidity-Hold Mode</h2>
-  <div class="form-row">
-    <div class="form-group">
-      <label>Target Humidity (%)</label>
-      <input type="number" id="humTarget" value="30" min="1" max="99" step="1" />
-    </div>
-    <div class="form-group">
-      <label>Max Temp (°C)</label>
-      <input type="number" id="humTempMax" value="55" min="1" max="70" step="1" />
-    </div>
-    <div class="form-group">
-      <label>Min Temp (°C)</label>
-      <input type="number" id="humTempMin" value="35" min="1" max="70" step="1" />
-    </div>
-    <div class="form-group">
-      <label>Max Hours (0=∞)</label>
-      <input type="number" id="humMaxHours" value="0" min="0" max="168" step="1" />
-    </div>
-  </div>
-  <div class="btn-row">
-    <button class="btn btn-green" onclick="startHumidity()">💧 Start Humidity Hold</button>
-  </div>
-</div>
-
-<div id="toast"></div>
-
-<script>
-/* ========================================================================
-   Configuration
-   ======================================================================== */
-  const BASE_URL = (() => {
-  const origin = window.location.origin;
-  // If served by Moonraker, use its origin; otherwise use localhost.
-  if (origin && origin !== 'null' && !origin.startsWith('file:')) return origin;
-  return 'http://localhost:7125';
-})();
-
-const POLL_INTERVAL_MS = 5000;
-
-/* ========================================================================
-   State
-   ======================================================================== */
-let state = {
-  active: false,
-  mode: 'idle',
-  targetTemp: 0,
-  currentHumidity: null,
-  targetHumidity: null,
-  remainingSeconds: 0,
-  tempMin: 0,
-  tempMax: 0,
-};
-let heaterActual = null;
-let heaterTarget = null;
-let countdownTimer = null;
-let totalSeconds = 0;   // total duration for progress bar (timed mode)
-let humidityHistory = []; // { t, v }[]
-
-/* ========================================================================
-   API helpers
-   ======================================================================== */
-async function apiGet(path) {
-  const res = await fetch(BASE_URL + path, { cache: 'no-store' });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  return res.json();
-}
-
-async function sendGcode(cmd) {
-  const res = await fetch(BASE_URL + '/printer/gcode/script', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ script: cmd }),
-  });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-}
-
-/* ========================================================================
-   Polling
-   ======================================================================== */
-async function poll() {
-  try {
-    const data = await apiGet(
-      '/printer/objects/query?vivid_dryer&heater_generic+Vivid_1_dryer'
-    );
-    const vd = data?.result?.status?.vivid_dryer;
-    const hg = data?.result?.status?.['heater_generic Vivid_1_dryer'];
-
-    if (!vd) { showOffline(); return; }
-
-    heaterActual = hg?.temperature ?? null;
-    heaterTarget = hg?.target ?? null;
-
-    const prevActive = state.active;
-    state.active           = vd.active;
-    state.mode             = vd.mode;
-    state.targetTemp       = vd.target_temp;
-    state.currentHumidity  = vd.current_humidity;
-    state.targetHumidity   = vd.target_humidity;
-    state.remainingSeconds = vd.remaining_seconds;
-    state.tempMin          = vd.temp_min;
-    state.tempMax          = vd.temp_max;
-
-    // record total seconds when a timed cycle starts
-    if (state.active && state.mode === 'timed' && !prevActive) {
-      totalSeconds = state.remainingSeconds;
-    }
-    // reset when going idle
-    if (!state.active) { totalSeconds = 0; stopCountdown(); }
-
-    // feed sparkline
-    if (state.currentHumidity !== null) {
-      humidityHistory.push({ t: Date.now(), v: state.currentHumidity });
-      if (humidityHistory.length > 30) humidityHistory.shift();
+    async function apiGet(path) {
+      const res = await fetch(BASE + path);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
     }
 
-    renderStatus();
-    if (state.active && state.mode === 'timed') startCountdown(state.remainingSeconds);
-  } catch (e) {
-    showOffline();
-  }
-}
-
-function showOffline() {
-  document.getElementById('modeBadge').className = 'badge badge-offline';
-  document.getElementById('modeBadge').textContent = 'OFFLINE';
-  document.getElementById('heaterTemp').textContent = '—';
-  document.getElementById('heaterTarget').textContent = '';
-  document.getElementById('timeLeft').textContent = '—';
-  document.getElementById('stopRow').style.display = 'none';
-  document.getElementById('progressWrap').style.display = 'none';
-  document.getElementById('sparklineWrap').style.display = 'none';
-  document.getElementById('humidStat').style.display = 'none';
-}
-
-/* ========================================================================
-   Render
-   ======================================================================== */
-function renderStatus() {
-  const badge  = document.getElementById('modeBadge');
-  const stopRow = document.getElementById('stopRow');
-
-  // Mode badge
-  badge.textContent = state.mode.toUpperCase();
-  badge.className = 'badge badge-' + (state.mode === 'idle' ? 'idle'
-                    : state.mode === 'timed' ? 'timed' : 'humidity');
-
-  // Heater
-  document.getElementById('heaterTemp').textContent =
-    heaterActual !== null ? heaterActual.toFixed(1) + '°C' : '—';
-  document.getElementById('heaterTarget').textContent =
-    heaterTarget !== null && heaterTarget > 0
-      ? 'target ' + heaterTarget.toFixed(1) + '°C' : '';
-
-  // Humidity
-  const humidStat = document.getElementById('humidStat');
-  if (state.currentHumidity !== null) {
-    humidStat.style.display = '';
-    document.getElementById('humidValue').textContent =
-      state.currentHumidity.toFixed(1) + '%';
-    document.getElementById('humidTarget').textContent =
-      state.targetHumidity !== null ? 'target ' + state.targetHumidity.toFixed(0) + '%' : '';
-  } else {
-    humidStat.style.display = 'none';
-  }
-
-  // Time left
-  if (!state.active) {
-    document.getElementById('timeLeft').textContent = '—';
-  } else if (state.mode === 'humidity' && state.remainingSeconds === 0) {
-    document.getElementById('timeLeft').textContent = '∞';
-  } else {
-    document.getElementById('timeLeft').textContent =
-      formatSeconds(state.remainingSeconds);
-  }
-
-  // Progress bar (timed mode)
-  const pw = document.getElementById('progressWrap');
-  if (state.active && state.mode === 'timed' && totalSeconds > 0) {
-    pw.style.display = '';
-    const pct = Math.max(0, Math.min(100,
-      100 * (1 - state.remainingSeconds / totalSeconds)));
-    document.getElementById('progressFill').style.width = pct.toFixed(1) + '%';
-    document.getElementById('progressPct').textContent = pct.toFixed(0) + '%';
-  } else {
-    pw.style.display = 'none';
-  }
-
-  // Sparkline (humidity mode with data)
-  const sw = document.getElementById('sparklineWrap');
-  if (state.mode === 'humidity' && humidityHistory.length > 1) {
-    sw.style.display = '';
-    drawSparkline();
-  } else {
-    sw.style.display = 'none';
-  }
-
-  // Stop button
-  stopRow.style.display = state.active ? '' : 'none';
-}
-
-/* ========================================================================
-   Live countdown (client-side, 1-second ticks)
-   ======================================================================== */
-function startCountdown(seconds) {
-  stopCountdown();
-  let remaining = seconds;
-  countdownTimer = setInterval(() => {
-    remaining = Math.max(0, remaining - 1);
-    document.getElementById('timeLeft').textContent = formatSeconds(remaining);
-    if (totalSeconds > 0) {
-      const pct = 100 * (1 - remaining / totalSeconds);
-      document.getElementById('progressFill').style.width = pct.toFixed(1) + '%';
-      document.getElementById('progressPct').textContent = pct.toFixed(0) + '%';
+    async function sendGCode(script) {
+      const res = await fetch(BASE + '/printer/gcode/script', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ script }),
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
     }
-    if (remaining <= 0) stopCountdown();
-  }, 1000);
-}
 
-function stopCountdown() {
-  if (countdownTimer !== null) { clearInterval(countdownTimer); countdownTimer = null; }
-}
+    // ------------------------------------------------------------------
+    // Instance discovery
+    // ------------------------------------------------------------------
 
-/* ========================================================================
-   Sparkline
-   ======================================================================== */
-function drawSparkline() {
-  const canvas = document.getElementById('sparkline');
-  const dpr = window.devicePixelRatio || 1;
-  const W = canvas.parentElement.clientWidth || 300;
-  const H = 70;
-  canvas.width  = W * dpr;
-  canvas.height = H * dpr;
-  canvas.style.width  = W + 'px';
-  canvas.style.height = H + 'px';
+    async function discoverInstances() {
+      const data = await apiGet('/printer/objects/list');
+      const objects = data.result.objects;
+      instances = objects.filter(
+        k => k === 'vivid_dryer' || k.startsWith('vivid_dryer ')
+      );
+      instances.forEach(k => {
+        if (!sparkData[k]) sparkData[k] = [];
+        if (!countdownState[k]) countdownState[k] = { remaining: 0, lastPoll: 0 };
+      });
+    }
 
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-  ctx.clearRect(0, 0, W, H);
+    // ------------------------------------------------------------------
+    // Status polling
+    // ------------------------------------------------------------------
 
-  const vals = humidityHistory.map(p => p.v);
-  const minV = Math.min(...vals) - 2;
-  const maxV = Math.max(...vals) + 2;
-  const range = maxV - minV || 1;
+    async function pollAll() {
+      if (!instances.length) {
+        document.getElementById('instances').innerHTML =
+          '<p class="offline-banner">No vivid_dryer instances found.<br>Check your printer.cfg and Klipper logs.</p>';
+        return;
+      }
 
-  const pad = 4;
-  const xStep = (W - pad * 2) / Math.max(vals.length - 1, 1);
+      const query = instances.map(k => encodeURIComponent(k)).join('&');
+      let data;
+      try {
+        data = await apiGet('/printer/objects/query?' + query);
+      } catch (e) {
+        renderOffline();
+        return;
+      }
 
-  // draw target humidity line
-  if (state.targetHumidity !== null) {
-    const ty = H - pad - ((state.targetHumidity - minV) / range) * (H - pad * 2);
-    ctx.save();
-    ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = '#66bb6a';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(pad, ty);
-    ctx.lineTo(W - pad, ty);
-    ctx.stroke();
-    ctx.restore();
-  }
+      const status = data.result.status;
+      const now = Date.now() / 1000;
 
-  // gradient fill
-  const grad = ctx.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, 'rgba(79,195,247,0.3)');
-  grad.addColorStop(1, 'rgba(79,195,247,0)');
+      instances.forEach(key => {
+        const s = status[key] || {};
 
-  ctx.beginPath();
-  vals.forEach((v, i) => {
-    const x = pad + i * xStep;
-    const y = H - pad - ((v - minV) / range) * (H - pad * 2);
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-  });
-  ctx.strokeStyle = '#4fc3f7';
-  ctx.lineWidth = 2;
-  ctx.stroke();
+        // Update sparkline data
+        if (s.mode === 'humidity' && s.current_humidity > 0) {
+          const arr = sparkData[key];
+          arr.push({ t: now, h: s.current_humidity });
+          if (arr.length > 30) arr.shift();
+        }
 
-  // fill under line
-  ctx.lineTo(pad + (vals.length - 1) * xStep, H - pad);
-  ctx.lineTo(pad, H - pad);
-  ctx.closePath();
-  ctx.fillStyle = grad;
-  ctx.fill();
-}
+        // Update countdown state
+        if (s.active && s.mode === 'timed') {
+          countdownState[key] = {
+            remaining: s.remaining_seconds,
+            totalSecs: s.total_seconds || 0,
+            lastPoll: now,
+          };
+        } else if (!s.active || s.mode !== 'timed') {
+          countdownState[key] = { remaining: 0, totalSecs: 0, lastPoll: now };
+        }
 
-/* ========================================================================
-   Button handlers
-   ======================================================================== */
-function startTimed() {
-  const temp    = parseFloat(document.getElementById('timedTemp').value) || 55;
-  const hours   = parseFloat(document.getElementById('timedHours').value) || 0;
-  const minutes = parseFloat(document.getElementById('timedMinutes').value) || 0;
-  const seconds = parseFloat(document.getElementById('timedSeconds').value) || 0;
-  const cmd = `VIVID_DRY_START TEMP=${temp} HOURS=${hours} MINUTES=${minutes} SECONDS=${seconds}`;
-  totalSeconds = hours * 3600 + minutes * 60 + seconds;
-  sendGcode(cmd).then(() => { toast('Timed cycle started'); poll(); })
-                .catch(e => toast('Error: ' + e.message, true));
-}
+        renderCard(key, s);
+      });
+    }
 
-function startHumidity() {
-  const humidity  = parseFloat(document.getElementById('humTarget').value) || 30;
-  const tempMax   = parseFloat(document.getElementById('humTempMax').value) || 55;
-  const tempMin   = parseFloat(document.getElementById('humTempMin').value) || 35;
-  const maxHours  = parseFloat(document.getElementById('humMaxHours').value) || 0;
-  let cmd = `VIVID_DRY_START HUMIDITY=${humidity} TEMP_MAX=${tempMax} TEMP_MIN=${tempMin}`;
-  if (maxHours > 0) cmd += ` MAX_HOURS=${maxHours}`;
-  sendGcode(cmd).then(() => { toast('Humidity-hold started'); poll(); })
-                .catch(e => toast('Error: ' + e.message, true));
-}
+    function renderOffline() {
+      document.getElementById('instances').innerHTML =
+        '<p class="offline-banner">&#x26A0;&#xFE0F; Moonraker offline</p>';
+    }
 
-function sendStop() {
-  sendGcode('VIVID_DRY_STOP')
-    .then(() => { toast('Dryer stopped'); poll(); })
-    .catch(e => toast('Error: ' + e.message, true));
-}
+    // ------------------------------------------------------------------
+    // Card rendering
+    // ------------------------------------------------------------------
 
-/* ========================================================================
-   Toast notification
-   ======================================================================== */
-function toast(msg, isError) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.style.background = isError ? '#7f1818' : '#323232';
-  el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 3000);
-}
+    function instanceLabel(key) {
+      if (key === 'vivid_dryer') return 'Dryer';
+      return key.replace(/^vivid_dryer\s+/i, '');
+    }
 
-/* ========================================================================
-   Utilities
-   ======================================================================== */
-function formatSeconds(s) {
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = Math.floor(s % 60);
-  return [h, m, sec].map(n => String(n).padStart(2, '0')).join(':');
-}
+    function cmdSuffix(key) {
+      if (key === 'vivid_dryer') return '';
+      const name = key.replace(/^vivid_dryer\s+/i, '');
+      return '_' + name.toUpperCase().replace(/\s+/g, '_');
+    }
 
-/* ========================================================================
-   Init
-   ======================================================================== */
-poll();
-setInterval(poll, POLL_INTERVAL_MS);
-window.addEventListener('resize', () => {
-  if (state.mode === 'humidity' && humidityHistory.length > 1) drawSparkline();
-});
-</script>
+    function fmt1(v) { return (v == null ? '—' : (+v).toFixed(1)); }
+    function fmt0(v) { return (v == null ? '—' : Math.round(+v).toString()); }
+
+    function fmtCountdown(secs) {
+      if (secs <= 0) return '00:00:00';
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = Math.floor(secs % 60);
+      return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    }
+
+    function renderCard(key, s) {
+      const container = document.getElementById('instances');
+      const cardId = 'card-' + key.replace(/\s+/g, '_');
+      let card = document.getElementById(cardId);
+      if (!card) {
+        card = document.createElement('div');
+        card.className = 'card';
+        card.id = cardId;
+        container.appendChild(card);
+      }
+
+      const mode = s.mode || 'idle';
+      const active = !!s.active;
+      const suffix = cmdSuffix(key);
+      const label = instanceLabel(key);
+
+      // Badge
+      let badgeClass, badgeText;
+      if (!active)            { badgeClass = 'badge-idle';     badgeText = 'IDLE'; }
+      else if (mode === 'timed')   { badgeClass = 'badge-timed';    badgeText = 'TIMED'; }
+      else if (mode === 'humidity') { badgeClass = 'badge-humidity'; badgeText = 'HUMIDITY'; }
+      else                    { badgeClass = 'badge-idle';     badgeText = 'IDLE'; }
+
+      // Countdown (client-side ticking)
+      let displayRemaining = 0;
+      if (active && mode === 'timed') {
+        const cs = countdownState[key];
+        const elapsed = Date.now() / 1000 - cs.lastPoll;
+        displayRemaining = Math.max(0, cs.remaining - elapsed);
+      }
+
+      // Progress bar
+      let progressHtml = '';
+      if (active && mode === 'timed') {
+        const totalSecs = s.total_seconds || 0;
+        const pct = totalSecs > 0
+          ? Math.max(0, Math.min(100, (1 - displayRemaining / totalSecs) * 100))
+          : 0;
+        progressHtml = `
+          <div class="progress-wrap">
+            <div class="progress-label">
+              <span>Progress</span>
+              <span>${fmtCountdown(displayRemaining)} remaining</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="pbar-${cardId}" style="width:${pct.toFixed(1)}%"></div>
+            </div>
+          </div>`;
+      }
+
+      // Sparkline
+      let sparkHtml = '';
+      if (active && mode === 'humidity' && sparkData[key].length >= 2) {
+        sparkHtml = `
+          <div class="sparkline-wrap">
+            <div class="sparkline-label">Humidity trend (last ${sparkData[key].length} readings)</div>
+            ${buildSparklineSVG(sparkData[key], s.target_humidity)}
+          </div>`;
+      }
+
+      // Heater temp color
+      const hTemp = s.heater_temp || 0;
+      const hTarget = s.heater_target || 0;
+      const hClass = hTemp > 50 ? 'hot' : hTemp > 30 ? 'ok' : 'cool';
+
+      card.innerHTML = `
+        <div class="card-header">
+          <span class="card-title">&#x1F321;&#xFE0F; ${escHtml(label)}</span>
+          <span class="badge ${badgeClass}">${badgeText}</span>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat-item">
+            <label>Heater temp</label>
+            <span class="val ${hClass}">${fmt1(hTemp)} °C</span>
+          </div>
+          <div class="stat-item">
+            <label>Heater target</label>
+            <span class="val">${fmt1(hTarget)} °C</span>
+          </div>
+          <div class="stat-item">
+            <label>PTC ambient</label>
+            <span class="val">${fmt1(s.ambient_temp)} °C</span>
+          </div>
+          <div class="stat-item">
+            <label>Humidity avg</label>
+            <span class="val ok">${fmt0(s.current_humidity)} %</span>
+          </div>
+          <div class="stat-item">
+            <label>Humidity left</label>
+            <span class="val">${fmt0(s.current_humidity_left)} %</span>
+          </div>
+          <div class="stat-item">
+            <label>Humidity right</label>
+            <span class="val">${fmt0(s.current_humidity_right)} %</span>
+          </div>
+          ${mode === 'humidity' ? `
+          <div class="stat-item">
+            <label>Target RH</label>
+            <span class="val">${fmt0(s.target_humidity)} %</span>
+          </div>
+          <div class="stat-item">
+            <label>Temp range</label>
+            <span class="val">${fmt1(s.temp_min)}–${fmt1(s.temp_max)} °C</span>
+          </div>` : ''}
+          ${mode === 'timed' ? `
+          <div class="stat-item">
+            <label>Set temp</label>
+            <span class="val">${fmt1(s.target_temp)} °C</span>
+          </div>
+          <div class="stat-item">
+            <label>Countdown</label>
+            <span class="val" id="cd-${cardId}">${fmtCountdown(displayRemaining)}</span>
+          </div>` : ''}
+        </div>
+
+        ${progressHtml}
+        ${sparkHtml}
+
+        <hr class="divider" />
+        <div class="controls">
+          <div class="section-label">Timed mode</div>
+          <div class="form-row">
+            <div class="form-field">
+              <label>Temp °C</label>
+              <input type="number" id="t-temp-${cardId}" value="55" min="20" max="75" step="1" />
+            </div>
+            <div class="form-field">
+              <label>Hours</label>
+              <input type="number" id="t-hours-${cardId}" value="4" min="0" step="1" />
+            </div>
+            <div class="form-field">
+              <label>Min</label>
+              <input type="number" id="t-min-${cardId}" value="0" min="0" max="59" step="1" />
+            </div>
+            <div class="form-field">
+              <label>Sec</label>
+              <input type="number" id="t-sec-${cardId}" value="0" min="0" max="59" step="1" />
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn-timed" onclick="startTimed(${JSON.stringify(key)}, ${JSON.stringify(cardId)}, ${JSON.stringify(suffix)})">&#x25B6; Start Timed</button>
+          </div>
+
+          <div class="section-label">Humidity-hold mode</div>
+          <div class="form-row">
+            <div class="form-field">
+              <label>Target %RH</label>
+              <input type="number" id="h-rh-${cardId}" value="30" min="1" max="99" step="1" />
+            </div>
+            <div class="form-field">
+              <label>Temp max °C</label>
+              <input type="number" id="h-tmax-${cardId}" value="55" min="20" max="75" step="1" />
+            </div>
+            <div class="form-field">
+              <label>Temp min °C</label>
+              <input type="number" id="h-tmin-${cardId}" value="35" min="20" max="75" step="1" />
+            </div>
+            <div class="form-field">
+              <label>Max hrs</label>
+              <input type="number" id="h-mh-${cardId}" value="0" min="0" step="1" title="0 = no timeout" />
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn-humid" onclick="startHumidity(${JSON.stringify(key)}, ${JSON.stringify(cardId)}, ${JSON.stringify(suffix)})">&#x1F4A7; Start Humidity</button>
+            <button class="btn-stop"  onclick="stopCycle(${JSON.stringify(suffix)})">&#x25A0; Stop</button>
+          </div>
+        </div>`;
+    }
+
+    // ------------------------------------------------------------------
+    // Sparkline SVG
+    // ------------------------------------------------------------------
+
+    function buildSparklineSVG(data, targetRH) {
+      const W = 300, H = 60, PAD = 4;
+      const hvals = data.map(d => d.h);
+      let lo = Math.min(...hvals) - 2;
+      let hi = Math.max(...hvals) + 2;
+      if (targetRH != null) {
+        lo = Math.min(lo, targetRH - 2);
+        hi = Math.max(hi, targetRH + 2);
+      }
+      if (hi <= lo) hi = lo + 1;
+
+      const scaleX = (i) => PAD + (i / (data.length - 1)) * (W - 2 * PAD);
+      const scaleY = (v) => H - PAD - ((v - lo) / (hi - lo)) * (H - 2 * PAD);
+
+      const pts = data.map((d, i) => scaleX(i) + ',' + scaleY(d.h));
+      const area = pts.join(' L ') + ` L ${scaleX(data.length-1)},${H-PAD} L ${scaleX(0)},${H-PAD} Z`;
+      const line = 'M ' + pts.join(' L ');
+
+      let targetLine = '';
+      if (targetRH != null) {
+        const ty = scaleY(targetRH).toFixed(1);
+        targetLine = `<line x1="${PAD}" y1="${ty}" x2="${W-PAD}" y2="${ty}" stroke="#66bb6a" stroke-width="1" stroke-dasharray="4,3" opacity="0.7"/>`;
+      }
+
+      return `<svg class="sparkline" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4fc3f7" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#4fc3f7" stop-opacity="0.05"/>
+    </linearGradient>
+  </defs>
+  ${targetLine}
+  <path d="M ${area}" fill="url(#sg)" />
+  <path d="${line}" fill="none" stroke="#4fc3f7" stroke-width="1.5" stroke-linejoin="round"/>
+</svg>`;
+    }
+
+    // ------------------------------------------------------------------
+    // Client-side countdown tick
+    // ------------------------------------------------------------------
+
+    function tickCountdowns() {
+      const now = Date.now() / 1000;
+      instances.forEach(key => {
+        const cs = countdownState[key];
+        if (!cs || cs.remaining <= 0) return;
+        const cardId = 'card-' + key.replace(/\s+/g, '_');
+        const el = document.getElementById('cd-' + cardId);
+        if (!el) return;
+        const elapsed = now - cs.lastPoll;
+        const rem = Math.max(0, cs.remaining - elapsed);
+        el.textContent = fmtCountdown(rem);
+        // Update progress bar using total cycle duration from server
+        const pbar = document.getElementById('pbar-' + cardId);
+        if (pbar && cs.totalSecs > 0) {
+          const pct = Math.min(100, ((cs.totalSecs - rem) / cs.totalSecs) * 100);
+          pbar.style.width = pct.toFixed(1) + '%';
+        }
+      });
+    }
+
+    // ------------------------------------------------------------------
+    // GCode actions
+    // ------------------------------------------------------------------
+
+    async function startTimed(key, cardId, suffix) {
+      const temp  = parseFloat(document.getElementById('t-temp-'  + cardId).value) || 55;
+      const hours = parseFloat(document.getElementById('t-hours-' + cardId).value) || 0;
+      const min   = parseFloat(document.getElementById('t-min-'   + cardId).value) || 0;
+      const sec   = parseFloat(document.getElementById('t-sec-'   + cardId).value) || 0;
+      const cmd = `VIVID_DRY_START${suffix} TEMP=${temp} HOURS=${hours} MINUTES=${min} SECONDS=${sec}`;
+      try {
+        await sendGCode(cmd);
+        showToast('Timed cycle started', true);
+        setTimeout(pollAll, 800);
+      } catch (e) {
+        showToast('Error: ' + e.message, false);
+      }
+    }
+
+    async function startHumidity(key, cardId, suffix) {
+      const rh   = parseFloat(document.getElementById('h-rh-'   + cardId).value) || 30;
+      const tmax = parseFloat(document.getElementById('h-tmax-' + cardId).value) || 55;
+      const tmin = parseFloat(document.getElementById('h-tmin-' + cardId).value) || 35;
+      const mh   = parseFloat(document.getElementById('h-mh-'   + cardId).value) || 0;
+      let cmd = `VIVID_DRY_START${suffix} HUMIDITY=${rh} TEMP_MAX=${tmax} TEMP_MIN=${tmin}`;
+      if (mh > 0) cmd += ` MAX_HOURS=${mh}`;
+      try {
+        await sendGCode(cmd);
+        showToast('Humidity-hold mode started', true);
+        setTimeout(pollAll, 800);
+      } catch (e) {
+        showToast('Error: ' + e.message, false);
+      }
+    }
+
+    async function stopCycle(suffix) {
+      try {
+        await sendGCode('VIVID_DRY_STOP' + suffix);
+        showToast('Cycle stopped', true);
+        setTimeout(pollAll, 800);
+      } catch (e) {
+        showToast('Error: ' + e.message, false);
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // Toast
+    // ------------------------------------------------------------------
+
+    let toastTimer = null;
+    function showToast(msg, ok) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = 'show' + (ok ? '' : ' err');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+    }
+
+    // ------------------------------------------------------------------
+    // Utility
+    // ------------------------------------------------------------------
+
+    function escHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ------------------------------------------------------------------
+    // Init
+    // ------------------------------------------------------------------
+
+    async function init() {
+      try {
+        await discoverInstances();
+      } catch (e) {
+        renderOffline();
+      }
+      await pollAll();
+      setInterval(pollAll, POLL_MS);
+      tickTimer = setInterval(tickCountdowns, 1000);
+    }
+
+    init();
+  </script>
 </body>
 </html>
