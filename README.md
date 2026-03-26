@@ -86,8 +86,13 @@ included in `vivid_dryer.cfg`):
 
 ## Quick Install
 
+Download and inspect the script, then run it:
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ikwidtech/vivid_heater/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ikwidtech/vivid_heater/main/install.sh -o install.sh
+# Review the script before running:
+less install.sh
+bash install.sh
 ```
 
 Or with options:

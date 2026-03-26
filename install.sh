@@ -208,7 +208,7 @@ if [[ -n "$MAINSAIL_DIR" ]]; then
   echo ""
 fi
 echo -e "${YELLOW}GCode commands for instance '$INSTANCE':${NC}"
-SUFFIX="${INSTANCE^^}"   # uppercase
+SUFFIX="$(echo "$INSTANCE" | tr '[:lower:]' '[:upper:]')"
 echo ""
 echo "  VIVID_DRY_START_${SUFFIX} TEMP=55 HOURS=4"
 echo "  VIVID_DRY_START_${SUFFIX} HUMIDITY=30 TEMP_MAX=55 TEMP_MIN=35"

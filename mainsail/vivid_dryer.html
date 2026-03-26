@@ -579,7 +579,7 @@
       } else if (st.active && st.mode === 'humidity' && st.remaining_seconds === 0) {
         // Humidity mode with no timeout — show infinity symbol
         countdownWrap.style.display = 'block';
-        countdown.textContent = '\u221E';
+        countdown.textContent = '\u221e'; // infinity symbol
         progressWrap.style.display = 'none';
         inst.remainingSeconds = 0;
       } else {
